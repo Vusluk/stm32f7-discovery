@@ -1,2 +1,3 @@
 # fetched sources
-/stm32cube
+/.stm32cube
+/builds
