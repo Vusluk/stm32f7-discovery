@@ -5,97 +5,63 @@
 .thumb
 @COMPILER SETUP <<-- END
 
-@DEFINE INTERNAL RAM
-@16Kb
-.set ITCM_RAM_START                   ,0x00000000
-.set ITCM_RAM_END                     ,0x00003FFF
-
-@64Kb
-.set DTCM_RAM_START                   ,0x20000000
-.set DTCM_RAM_END                     ,0x2000FFFF
-
-@Total 256Kb
-.set INT_SRAM_START                   ,0x20010000
-.set INT_SRAM_END                     ,0x2004FFFF
-
-@240Kb
-.set INT_SRAM1_START                  ,0x20010000
-.set INT_SRAM1_END                    ,0x2004BFFF
-@16Kb
-.set INT_SRAM2_START                  ,0x2004C000
-.set INT_SRAM2_END                    ,0x2004FFFF
+@MACROS -->> START
+.macro	MOV32 regnum,number
+  MOVW \regnum,:lower16:\number
+  MOVT \regnum,:upper16:\number
+.endm
+@MACROS -->> END
 
 
-@DEFINE INTERNAL FLASH
-@MAIN MEMORY BLOCK
-.set INT_FLASH_MAIN_AXIM_START        ,0x08000000
-.set INT_FLASH_MAIN_AXIM_END          ,0x080FFFFF
-
-.set INT_FLASH_MAIN_ITCM_START        ,0x00200000
-.set INT_FLASH_MAIN_ITCM_END          ,0x002FFFFF
-
-@SECTOR 0: 32Kb
-.set INT_FLASH_MAIN_0_AXIM_START      ,0x08000000
-.set INT_FLASH_MAIN_0_AXIM_END        ,0x08007FFF
-
-.set INT_FLASH_MAIN_0_ITCM_START      ,0x00200000
-.set INT_FLASH_MAIN_0_ITCM_END        ,0x00207FFF
-
-@SECTOR 1: 32Kb
-.set INT_FLASH_MAIN_1_AXIM_START      ,0x08008000
-.set INT_FLASH_MAIN_1_AXIM_END        ,0x0800FFFF
-
-.set INT_FLASH_MAIN_1_ITCM_START      ,0x00208000
-.set INT_FLASH_MAIN_1_ITCM_END        ,0x0020FFFF
-
-@SECTOR 2: 32Kb
-.set INT_FLASH_MAIN_2_AXIM_START      ,0x08010000
-.set INT_FLASH_MAIN_2_AXIM_END        ,0x08017FFF
-
-.set INT_FLASH_MAIN_2_ITCM_START      ,0x00210000
-.set INT_FLASH_MAIN_2_ITCM_END        ,0x00217FFF
-
-@SECTOR 3: 32Kb
-.set INT_FLASH_MAIN_3_AXIM_START      ,0x08018000
-.set INT_FLASH_MAIN_3_AXIM_END        ,0x0801FFFF
-
-.set INT_FLASH_MAIN_3_ITCM_START      ,0x00218000
-.set INT_FLASH_MAIN_3_ITCM_END        ,0x0021FFFF
-
-@SECTOR 4: 128Kb
-.set INT_FLASH_MAIN_4_AXIM_START      ,0x08020000
-.set INT_FLASH_MAIN_4_AXIM_END        ,0x0803FFFF
-
-.set INT_FLASH_MAIN_4_ITCM_START      ,0x00220000
-.set INT_FLASH_MAIN_4_ITCM_END        ,0x0023FFFF
-
-@SECTOR 5: 256Kb
-.set INT_FLASH_MAIN_5_AXIM_START      ,0x08040000
-.set INT_FLASH_MAIN_5_AXIM_END        ,0x0807FFFF
-
-.set INT_FLASH_MAIN_5_ITCM_START      ,0x00240000
-.set INT_FLASH_MAIN_5_ITCM_END        ,0x0027FFFF
-
-@SECTOR 6: 256Kb
-.set INT_FLASH_MAIN_6_AXIM_START      ,0x08080000
-.set INT_FLASH_MAIN_6_AXIM_END        ,0x080BFFFF
-
-.set INT_FLASH_MAIN_6_ITCM_START      ,0x00280000
-.set INT_FLASH_MAIN_6_ITCM_END        ,0x002BFFFF
-
-@SECTOR 7: 256Kb
-.set INT_FLASH_MAIN_7_AXIM_START      ,0x080C0000
-.set INT_FLASH_MAIN_7_AXIM_END        ,0x080FFFFF
-
-.set INT_FLASH_MAIN_7_ITCM_START      ,0x002C0000
-.set INT_FLASH_MAIN_7_ITCM_END        ,0x002FFFFF
-
+.include "./sources/memory.asm" @ Добавляем карту памяти(Memory Map)
+.include "./sources/peripheral.asm" @ Добавляем карту периферии
 
 .section .text
+.word INT_SRAM_END
+.word RESET + 1
+.word RESET + 1
+.word RESET + 1
+.word RESET + 1
+.word RESET + 1
+.word RESET + 1
 
-.word 0x2004FFFF
-.word Reset + 1
+.align 4
+.global RESET
+RESET:
+  BKPT
+  MRS     R10,  PSR
 
-Reset:      B Reset
+  MOV32   R0, RCC + RCC_AHB1ENR   @ Загрузили адрес RCC_AHB1ENR в R0
+  MOV32   R1, GPIOI_EN            @ Загрузили битовую маску в R1
+	LDR	    R2, [R0]			          @ прочитали значение регистра
+  ORR	    R1, R1, R2              @ логическое, побитовое ИЛИ : R1= R1 ИЛИ R2
+	STR	    R1, [R0]                @ запись R1 по адресу указанному в R0
+
+  MOV32   R0, GPIO_I + GPIO_MODER         @ Загрузили адрес GPIO_I_MODER в R0
+  MOV32   R1, GPIO_MODER_OUTPUT << (2*1)  @ Загрузили значение настройки для вывода 1 в R1
+	LDR	    R2, [R0]			                  @ прочитали текущее значение GPIO_I_MODER
+	ORR	    R1, R1, R2                      @ логическое, побитовое ИЛИ : R1= R1 ИЛИ R2
+	STR	    R1, [R0]                        @ записали новое значение GPIO_I_MODER
+
+  MOV32   R0, GPIO_I + GPIO_BSRR          @ Загрузили адрес GPIO_I_BSRR в R0
+  MOV32   R1, 0x02                        @ Загрузили значение настройки для вывода 1 в R1
+	STR	    R1, [R0]                        @ записали новое значение GPIO_I_MODER
+
+  MOV32	  R2, 0x00020000
+Delay:
+  SUBS    R2, 0x1
+  IT      NE
+	BNE.W   Delay
+
+  BKPT
+
+  MOV32   R0, GPIO_I + GPIO_BSRR          @ Загрузили адрес GPIO_I_BSRR в R0
+  MOV32   R1, 0x02 << (1*16)              @ Загрузили значение настройки для вывода 1 в R1
+	STR	    R1, [R0]                        @ записали новое значение GPIO_I_MODER
+
+Cycle:
+  NOP
+  NOP
+  B       Cycle
 
 .end
